@@ -3,4 +3,4 @@ if exists('g:loaded_markdown_links_as_references')
 endif
 let g:loaded_markdown_links_as_references = 1
 
-command! MarkdownLinksAsReferences call markdown_links_as_references#convert()
+command! -bar -nargs=0 MarkdownLinksAsReferences call markdown_links_as_references#convert()

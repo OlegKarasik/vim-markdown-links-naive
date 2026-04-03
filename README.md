@@ -10,6 +10,22 @@ The command scans the current buffer and rewrites Markdown links into reference
 style links. Reference definitions are written at the bottom of the document in
 the order links first appear.
 
+## Installation (vim-plug)
+
+```vim
+call plug#begin('~/.vim/plugged')
+Plug 'OlegKarasik/vim-markdown-links-naive'
+call plug#end()
+```
+
+Optional lazy-loading by command:
+
+```vim
+call plug#begin('~/.vim/plugged')
+Plug 'OlegKarasik/vim-markdown-links-naive', { 'on': 'MarkdownLinksAsReferences' }
+call plug#end()
+```
+
 ## Example
 
 Input:
