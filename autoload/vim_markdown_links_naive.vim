@@ -24,7 +24,12 @@ function! s:get_or_add_reference(link_key, entry, key_to_index, ordered_refs) ab
   return a:key_to_index[a:link_key]
 endfunction
 
-function! markdown_links_as_references#convert() abort
+function! vim_markdown_links_naive#convert() abort
+  if !&modifiable || &readonly
+    echoerr 'vim-markdown-links-naive: current buffer is not modifiable'
+    return
+  endif
+
   let l:lines = getline(1, '$')
   let l:body_lines = []
   let l:definitions_by_label = {}

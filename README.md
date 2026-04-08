@@ -6,6 +6,12 @@ Vim plugin that exposes a single command:
 :MarkdownLinksAsReferences
 ```
 
+And a `<Plug>` mapping target for keybindings:
+
+```vim
+<Plug>(MarkdownLinksAsReferences)
+```
+
 The command scans the current buffer and rewrites Markdown links into reference
 style links. Reference definitions are written at the bottom of the document in
 the order links first appear.
@@ -24,6 +30,12 @@ Optional lazy-loading by command:
 call plug#begin('~/.vim/plugged')
 Plug 'OlegKarasik/vim-markdown-links-naive', { 'on': 'MarkdownLinksAsReferences' }
 call plug#end()
+```
+
+Optional keymap:
+
+```vim
+nmap <leader>mr <Plug>(MarkdownLinksAsReferences)
 ```
 
 ## Example
