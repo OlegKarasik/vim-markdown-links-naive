@@ -121,7 +121,7 @@ function! markdown_links_as_references#convert() abort
   endfor
 
   if !empty(l:ordered_refs)
-    if empty(l:converted_lines) || l:converted_lines[-1] !~# '^\s*$'
+    if !empty(l:converted_lines) && l:converted_lines[-1] !~# '^\s*$'
       call add(l:converted_lines, '')
     endif
 
@@ -149,7 +149,7 @@ function! markdown_links_as_references#convert() abort
   endfor
 
   if !empty(l:unused_defs)
-    if empty(l:converted_lines) || l:converted_lines[-1] !~# '^\s*$'
+    if !empty(l:converted_lines) && l:converted_lines[-1] !~# '^\s*$'
       call add(l:converted_lines, '')
     endif
     call extend(l:converted_lines, l:unused_defs)
