@@ -1,4 +1,4 @@
-function! s:parse_reference_definition(line) abort
+function! s:vim_markdown_links_naive_parse_reference_definition(line) abort
   let l:match = matchlist(a:line, '^\s*\[\([^]]\+\)\]:\s*\(\S\+\)\(\s\+.*\)\?$')
   if empty(l:match)
     return {}
@@ -16,7 +16,7 @@ function! s:parse_reference_definition(line) abort
         \ }
 endfunction
 
-function! s:get_or_add_reference(link_key, entry, key_to_index, ordered_refs) abort
+function! s:vim_markdown_links_naive_get_or_add_reference(link_key, entry, key_to_index, ordered_refs) abort
   if !has_key(a:key_to_index, a:link_key)
     call add(a:ordered_refs, a:entry)
     let a:key_to_index[a:link_key] = len(a:ordered_refs)
@@ -36,7 +36,7 @@ function! vim_markdown_links_naive#convert() abort
   let l:definition_order = []
 
   for l:line in l:lines
-    let l:def = s:parse_reference_definition(l:line)
+    let l:def = s:vim_markdown_links_naive_parse_reference_definition(l:line)
     if !empty(l:def)
       let l:key = tolower(l:def.label)
       if !has_key(l:definitions_by_label, l:key)
@@ -87,7 +87,7 @@ function! vim_markdown_links_naive#convert() abort
           let l:rebuilt .= l:token
         else
           let l:link_key = l:url . "\t" . l:title
-          let l:index = s:get_or_add_reference(
+          let l:index = s:vim_markdown_links_naive_get_or_add_reference(
                 \ l:link_key,
                 \ {'url': l:url, 'title': l:title},
                 \ l:key_to_index,
@@ -109,7 +109,7 @@ function! vim_markdown_links_naive#convert() abort
           let l:used_definition_labels[l:label_key] = 1
           let l:def = l:definitions_by_label[l:label_key]
           let l:link_key = l:def.url . "\t" . l:def.title
-          let l:index = s:get_or_add_reference(
+          let l:index = s:vim_markdown_links_naive_get_or_add_reference(
                 \ l:link_key,
                 \ {'url': l:def.url, 'title': l:def.title},
                 \ l:key_to_index,
