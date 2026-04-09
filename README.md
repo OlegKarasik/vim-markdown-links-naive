@@ -15,6 +15,8 @@ And a `<Plug>` mapping target for keybindings:
 The command scans the current buffer and rewrites Markdown links into reference
 style links. Reference definitions are written at the bottom of the document in
 the order links first appear.
+If no convertible Markdown links are found, the buffer is left unchanged and Vim
+shows a warning.
 
 ## Installation (vim-plug)
 

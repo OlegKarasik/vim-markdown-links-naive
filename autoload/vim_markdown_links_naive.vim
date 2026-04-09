@@ -24,6 +24,12 @@ function! s:vim_markdown_links_naive_get_or_add_reference(link_key, entry, key_t
   return a:key_to_index[a:link_key]
 endfunction
 
+function! s:vim_markdown_links_naive_warn(message) abort
+  echohl WarningMsg
+  echomsg 'vim-markdown-links-naive: ' . a:message
+  echohl None
+endfunction
+
 function! vim_markdown_links_naive#convert() abort
   if !&modifiable || &readonly
     echoerr 'vim-markdown-links-naive: current buffer is not modifiable'
@@ -53,6 +59,7 @@ function! vim_markdown_links_naive#convert() abort
   let l:used_definition_labels = {}
   let l:converted_lines = []
   let l:token_pattern = '\v\[[^][]+\]\([^()]+\)|\[[^][]+\]\[[^][]*\]'
+  let l:converted_link_count = 0
 
   for l:line in l:body_lines
     let l:rebuilt = ''
@@ -94,6 +101,7 @@ function! vim_markdown_links_naive#convert() abort
                 \ l:ordered_refs
                 \ )
           let l:rebuilt .= '[' . l:text . '][' . l:index . ']'
+          let l:converted_link_count += 1
         endif
       else
         let l:text = matchstr(l:token, '\v^\[\zs[^][]+\ze\]\[')
@@ -116,6 +124,7 @@ function! vim_markdown_links_naive#convert() abort
                 \ l:ordered_refs
                 \ )
           let l:rebuilt .= '[' . l:text . '][' . l:index . ']'
+          let l:converted_link_count += 1
         endif
       endif
 
@@ -124,6 +133,11 @@ function! vim_markdown_links_naive#convert() abort
 
     call add(l:converted_lines, l:rebuilt)
   endfor
+
+  if l:converted_link_count == 0
+    call s:vim_markdown_links_naive_warn('no markdown links were converted')
+    return
+  endif
 
   if !empty(l:ordered_refs)
     if !empty(l:converted_lines) && l:converted_lines[-1] !~# '^\s*$'

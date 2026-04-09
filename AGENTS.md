@@ -37,7 +37,7 @@
    enter/exit search mode using "CTRL+I" hotkey. Search in the popup items must be
    performed after input of every character. Inside the insert mode, popup title
    is updated to have "(Insert)" at the end. Exiting search mode retains input
-   filter.
+   filter. Also, in search mode popup support `CTRL+U` (to clear the filter).
 
 ## Popup Menus
 
