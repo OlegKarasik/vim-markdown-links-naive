@@ -1,72 +1,112 @@
-# Core Rules
+# Rules
 
-1. This is an independent plugin. Never introduce dependencies for other plugins.
-2. All work must be done in boundries of the repository directory. Never create
-   scripts or files outside of repository directory. Never redirect output outside
-   of repository.
-3. All errors and warnings must be issues throught the Vim build-in errors and
-   warnings functionality.
-4. The plugin must be compatible with `vim-plug` and keep a standard Vim plugin
-   layout (`plugin/` and `autoload/`).
-5. All public executable commands must support `<Plug>(<command>)` syntax to
-   enable keybindings by default.
-6. All plugin files/internal function should be named after the plugin, for
-   instance if plugin name is `vim-buffers-naive`, then all related files should
-   be `vim_buffers_naive*`.
+1. DO NOT create or edit files outside of repository.
+2. DO NOT redirect output from commands into files outside of repository.
+3. DO NOT take dependencies on other plugins.
+4. Keep standard Vim plugin layout (`plugin/` and `autoload/`).
+5. Public executable command must expose a `<Plug>(...)` mapping target.
 
-# Core Popup Rules
+# Startup
 
-1. All popups with titles have smooth, single line borders (as modern Vim popups).
-2. All popups with titles have standard Vim popup colours for background and
-   selection.
-3. All popups with titles DO NOT have ':' at the end.
-4. All popups with titles have MAX width of 30 symbols and MIN width of 10
-   symbols.
-5. All popups which respond to "x" and "ESC" to close the popup, "j" and "DOWN" to
-   move down, "k" and "UP" to move up, "b" and "ENTER" to make a choice.
+During startup (`plugin/vim_markdown_links_naive.vim`), the plugin:
 
-## Popup with Selection
-
-1. All popups with titles which are used for selecting items have DYNAMIC height
-   to keep up to 10 lines. If there are more than 10 lines, the popup scaled to 10
-   lines and supports scrolling.
-2. All popups with titles which are used for selecting items have numbers in front
-   of every item and display current item with * symbol, which is placed between
-   the number and item.
-3. All popups with titles which are used to selecting items support search must
-   enter/exit search mode using "CTRL+I" hotkey. Search in the popup items must be
-   performed after input of every character. Inside the insert mode, popup title
-   is updated to have "(Insert)" at the end. Exiting search mode retains input
-   filter. Also, in search mode popup support `CTRL+U` (to clear the filter).
-
-## Popup Menus
-
-1. All popups with titles which are used for menus (for instance, command
-   invocation) and do no require to restore state on repeating execution MUST to
-   no an indicator of the current item `*`.
-
-# Debug Rules
-
-1. All operations MUST be scoped to repository directory. Never create or
-   edit a file outside of repository directory.
-2. Information about vim commands and functions must be retrieved using the
-   `:help` command inside the vim. 
-
-# Asynchronous Rules
-
-1. All long running operations (invocation of external tools) must be
-   asynchronous.
-2. All asynchronous operations use vim terminal feature.
+1. Uses `g:loaded_vim_markdown_links_naive` guard to avoid double loading.
+2. Registers command: `:MarkdownLinksAsReferences`.
+3. Registers mapping target: `<Plug>(MarkdownLinksAsReferences)` which calls
+   `vim_markdown_links_naive#convert()`.
 
 # Concepts
 
-1. "Root Directory" - a directory where `CMakeLists.txt` file is located. "Root
-   Directory" is detected at runtime by searching for `CMakeLists.txt` upward
-   starting from the current directory.
-2. "Local Configuration" - a configuration file (`.vim-cmake-naive-config.json`)
-   located in the root directory.
-2. "Local Cache" - a cache file (`.vim-cmake-naive-cache.json`) located in the
-   root directory. 
-3. "Build Directory" - an directory path which is composed from root directory
-   path + `<output>/<preset>` values from local configuration if there is a
-   `<preset>` value set. Otherwise, it is set to root directory path + `<output>`.
+## Convertible Markdown Tokens
+
+The converter rewrites only these token forms:
+
+1. Inline link: `[text](url [title])`
+2. Reference link: `[text][label]`
+3. Collapsed reference link: `[text][]` (label defaults to `text`)
+
+Image tokens are skipped: if a token is immediately prefixed by `!`, it is kept
+as-is.
+
+## Reference Definition Lines
+
+Definition lines are parsed from full-buffer input using this shape:
+
+1. `[label]: url`
+2. `[label]: url title`
+
+Rules:
+
+1. Leading spaces before `[` are accepted.
+2. URL is parsed as first non-space token after `:`.
+3. Remaining text is treated as title (leading spaces trimmed).
+4. Labels are matched case-insensitively.
+5. For duplicate labels, first definition wins.
+
+## Numbered Reference Identity
+
+Generated numbered references are deduplicated by:
+
+1. `url + "\t" + title`
+
+So two links with same URL but different titles become different numbered
+definitions.
+
+## No-op and Error Behavior
+
+1. If buffer is non-modifiable or readonly, command errors with:
+   `vim-markdown-links-naive: current buffer is not modifiable`
+2. If no links are converted, buffer is left unchanged and warning is shown:
+   `vim-markdown-links-naive: no markdown links were converted`
+
+# Command
+
+## MarkdownLinksAsReferences
+
+Calls `vim_markdown_links_naive#convert()`.
+
+Execution flow:
+
+1. Reads full buffer.
+2. Splits input into:
+   1. body lines (non-definition lines)
+   2. known reference definitions (first per label, case-insensitive)
+3. Scans body lines token-by-token.
+4. Rewrites:
+   1. inline links to `[text][N]`
+   2. reference links with known labels to `[text][N]`
+   3. unknown reference labels unchanged
+   4. image links unchanged
+5. Appends generated numbered definitions at document bottom.
+6. Appends unused original definitions (labels never consumed by reference-link
+   conversion), preserving original definition order and label text.
+7. Replaces entire buffer content and deletes old trailing lines if needed.
+
+# Plug Mappings
+
+1. `<Plug>(MarkdownLinksAsReferences)`
+
+# Public Vimscript Functions
+
+## `vim_markdown_links_naive#convert()`
+
+Public conversion entry point for both command and `<Plug>` mapping.
+
+# Internal Script-Local Functions
+
+## `s:vim_markdown_links_naive_parse_reference_definition(line)`
+
+Parses one line and returns:
+
+1. `{}` when line is not a reference definition
+2. `{ "label": ..., "url": ..., "title": ... }` when parse succeeds
+
+## `s:vim_markdown_links_naive_get_or_add_reference(link_key, entry, key_to_index, ordered_refs)`
+
+Maintains ordered unique numbered references and returns 1-based reference
+index.
+
+## `s:vim_markdown_links_naive_warn(message)`
+
+Shows warning with Vim built-in warning output (`echohl WarningMsg` +
+`echomsg`), prefixed with `vim-markdown-links-naive:`.
