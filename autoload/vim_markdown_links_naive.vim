@@ -57,82 +57,94 @@ function! vim_markdown_links_naive#convert() abort
   let l:key_to_index = {}
   let l:ordered_refs = []
   let l:used_definition_labels = {}
-  let l:converted_lines = []
-  let l:token_pattern = '\v\[[^][]+\]\([^()]+\)|\[[^][]+\]\[[^][]*\]'
+  let l:token_pattern = '\v\[\_[^][]+\]\([^()]+\)|\[\_[^][]+\]\[\_[^][]*\]'
+  let l:inline_link_pattern = '\v^\[\_[^][]+\]\([^()]+\)$'
   let l:converted_link_count = 0
+  let l:body_text = join(l:body_lines, "\n")
+  let l:converted_body_text = ''
+  let l:start = 0
 
-  for l:line in l:body_lines
-    let l:rebuilt = ''
-    let l:start = 0
+  while 1
+    let l:m = matchstrpos(l:body_text, l:token_pattern, l:start)
+    let l:token = l:m[0]
+    let l:from = l:m[1]
+    let l:to = l:m[2]
 
-    while 1
-      let l:m = matchstrpos(l:line, l:token_pattern, l:start)
-      let l:token = l:m[0]
-      let l:from = l:m[1]
-      let l:to = l:m[2]
+    if l:from < 0
+      let l:converted_body_text .= strpart(l:body_text, l:start)
+      break
+    endif
 
-      if l:from < 0
-        let l:rebuilt .= strpart(l:line, l:start)
-        break
-      endif
+    let l:converted_body_text .= strpart(l:body_text, l:start, l:from - l:start)
 
-      let l:rebuilt .= strpart(l:line, l:start, l:from - l:start)
+    if l:from > 0 && strpart(l:body_text, l:from - 1, 1) ==# '!'
+      let l:converted_body_text .= l:token
+      let l:start = l:to
+      continue
+    endif
 
-      if l:from > 0 && strpart(l:line, l:from - 1, 1) ==# '!'
-        let l:rebuilt .= l:token
+    if l:token =~# l:inline_link_pattern
+      let l:text_separator = stridx(l:token, '](')
+      if l:text_separator < 1
+        let l:converted_body_text .= l:token
         let l:start = l:to
         continue
       endif
 
-      if l:token =~# '\v^\[[^][]+\]\([^()]+\)$'
-        let l:text = matchstr(l:token, '\v^\[\zs[^][]+\ze\]\(')
-        let l:inside = matchstr(l:token, '\v\]\(\zs[^()]+\ze\)$')
-        let l:url = matchstr(l:inside, '^\S\+')
-        let l:title = substitute(l:inside, '^\S\+\s*', '', '')
+      let l:text = strpart(l:token, 1, l:text_separator - 1)
+      let l:inside = strpart(l:token, l:text_separator + 2, strlen(l:token) - l:text_separator - 3)
+      let l:url = matchstr(l:inside, '^\S\+')
+      let l:title = substitute(l:inside, '^\S\+\s*', '', '')
 
-        if empty(l:url)
-          let l:rebuilt .= l:token
-        else
-          let l:link_key = l:url . "\t" . l:title
-          let l:index = s:vim_markdown_links_naive_get_or_add_reference(
-                \ l:link_key,
-                \ {'url': l:url, 'title': l:title},
-                \ l:key_to_index,
-                \ l:ordered_refs
-                \ )
-          let l:rebuilt .= '[' . l:text . '][' . l:index . ']'
-          let l:converted_link_count += 1
-        endif
+      if empty(l:url)
+        let l:converted_body_text .= l:token
       else
-        let l:text = matchstr(l:token, '\v^\[\zs[^][]+\ze\]\[')
-        let l:label = matchstr(l:token, '\v\]\[\zs[^][]*\ze\]$')
-        if empty(l:label)
-          let l:label = l:text
-        endif
-
-        let l:label_key = tolower(l:label)
-        if !has_key(l:definitions_by_label, l:label_key)
-          let l:rebuilt .= l:token
-        else
-          let l:used_definition_labels[l:label_key] = 1
-          let l:def = l:definitions_by_label[l:label_key]
-          let l:link_key = l:def.url . "\t" . l:def.title
-          let l:index = s:vim_markdown_links_naive_get_or_add_reference(
-                \ l:link_key,
-                \ {'url': l:def.url, 'title': l:def.title},
-                \ l:key_to_index,
-                \ l:ordered_refs
-                \ )
-          let l:rebuilt .= '[' . l:text . '][' . l:index . ']'
-          let l:converted_link_count += 1
-        endif
+        let l:link_key = l:url . "\t" . l:title
+        let l:index = s:vim_markdown_links_naive_get_or_add_reference(
+              \ l:link_key,
+              \ {'url': l:url, 'title': l:title},
+              \ l:key_to_index,
+              \ l:ordered_refs
+              \ )
+        let l:converted_body_text .= '[' . l:text . '][' . l:index . ']'
+        let l:converted_link_count += 1
+      endif
+    else
+      let l:text_separator = stridx(l:token, '][')
+      if l:text_separator < 1
+        let l:converted_body_text .= l:token
+        let l:start = l:to
+        continue
       endif
 
-      let l:start = l:to
-    endwhile
+      let l:text = strpart(l:token, 1, l:text_separator - 1)
+      let l:label = strpart(l:token, l:text_separator + 2, strlen(l:token) - l:text_separator - 3)
+      if empty(l:label)
+        let l:label = l:text
+      endif
 
-    call add(l:converted_lines, l:rebuilt)
-  endfor
+      let l:label_key = tolower(l:label)
+      if !has_key(l:definitions_by_label, l:label_key)
+        let l:converted_body_text .= l:token
+      else
+        let l:used_definition_labels[l:label_key] = 1
+        let l:def = l:definitions_by_label[l:label_key]
+        let l:link_key = l:def.url . "\t" . l:def.title
+        let l:index = s:vim_markdown_links_naive_get_or_add_reference(
+              \ l:link_key,
+              \ {'url': l:def.url, 'title': l:def.title},
+              \ l:key_to_index,
+              \ l:ordered_refs
+              \ )
+        let l:converted_body_text .= '[' . l:text . '][' . l:index . ']'
+        let l:converted_link_count += 1
+      endif
+    endif
+
+    let l:start = l:to
+  endwhile
+
+  let l:converted_lines = split(l:converted_body_text, "\n", 1)
 
   if l:converted_link_count == 0
     call s:vim_markdown_links_naive_warn('no markdown links were converted')
