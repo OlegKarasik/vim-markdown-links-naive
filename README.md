@@ -17,7 +17,8 @@ style links. Reference definitions are written at the bottom of the document in
 the order links first appear.
 If no convertible Markdown links are found, the buffer is left unchanged and Vim
 shows a warning.
-Inline links with link text spanning multiple lines are converted as well.
+Inline links with link text spanning multiple lines are converted as well,
+including link text with balanced square brackets (for example, `byte[]`).
 
 ## Installation (vim-plug)
 

@@ -30,6 +30,105 @@ function! s:vim_markdown_links_naive_warn(message) abort
   echohl None
 endfunction
 
+function! s:vim_markdown_links_naive_find_balanced_square_close(text, open_index) abort
+  let l:depth = 1
+  let l:index = a:open_index + 1
+  let l:text_len = strlen(a:text)
+
+  while l:index < l:text_len
+    let l:character = strpart(a:text, l:index, 1)
+    if l:character ==# '['
+      let l:depth += 1
+    elseif l:character ==# ']'
+      let l:depth -= 1
+      if l:depth == 0
+        return l:index
+      endif
+    endif
+    let l:index += 1
+  endwhile
+
+  return -1
+endfunction
+
+function! s:vim_markdown_links_naive_next_body_token(text, start) abort
+  let l:text_len = strlen(a:text)
+  let l:scan = a:start
+
+  while l:scan < l:text_len
+    let l:open_bracket = stridx(a:text, '[', l:scan)
+    if l:open_bracket < 0
+      return {'from': -1, 'to': -1, 'token': '', 'kind': ''}
+    endif
+
+    let l:text_close_bracket = s:vim_markdown_links_naive_find_balanced_square_close(a:text, l:open_bracket)
+    if l:text_close_bracket < 0 || l:text_close_bracket <= l:open_bracket + 1
+      let l:scan = l:open_bracket + 1
+      continue
+    endif
+
+    let l:text_part = strpart(a:text, l:open_bracket + 1, l:text_close_bracket - l:open_bracket - 1)
+    let l:after_text = l:text_close_bracket + 1
+    if l:after_text >= l:text_len
+      let l:scan = l:open_bracket + 1
+      continue
+    endif
+
+    let l:separator = strpart(a:text, l:after_text, 1)
+    if l:separator ==# '('
+      let l:inside_close_paren = stridx(a:text, ')', l:after_text + 1)
+      if l:inside_close_paren < 0
+        let l:scan = l:open_bracket + 1
+        continue
+      endif
+
+      let l:inside_part = strpart(a:text, l:after_text + 1, l:inside_close_paren - l:after_text - 1)
+      if stridx(l:inside_part, '(') >= 0
+        let l:scan = l:open_bracket + 1
+        continue
+      endif
+
+      let l:token_end = l:inside_close_paren + 1
+      return {
+            \ 'from': l:open_bracket,
+            \ 'to': l:token_end,
+            \ 'token': strpart(a:text, l:open_bracket, l:token_end - l:open_bracket),
+            \ 'kind': 'inline',
+            \ 'text': l:text_part,
+            \ 'inside': l:inside_part,
+            \ }
+    endif
+
+    if l:separator ==# '['
+      let l:label_close_bracket = stridx(a:text, ']', l:after_text + 1)
+      if l:label_close_bracket < 0
+        let l:scan = l:open_bracket + 1
+        continue
+      endif
+
+      let l:label_part = strpart(a:text, l:after_text + 1, l:label_close_bracket - l:after_text - 1)
+      if stridx(l:label_part, '[') >= 0
+        let l:scan = l:open_bracket + 1
+        continue
+      endif
+
+      let l:token_end = l:label_close_bracket + 1
+      return {
+            \ 'from': l:open_bracket,
+            \ 'to': l:token_end,
+            \ 'token': strpart(a:text, l:open_bracket, l:token_end - l:open_bracket),
+            \ 'kind': 'reference',
+            \ 'text': l:text_part,
+            \ 'label': l:label_part,
+            \ }
+    endif
+
+    let l:scan = l:open_bracket + 1
+  endwhile
+
+  return {'from': -1, 'to': -1, 'token': '', 'kind': ''}
+endfunction
+
 function! vim_markdown_links_naive#convert() abort
   if !&modifiable || &readonly
     echoerr 'vim-markdown-links-naive: current buffer is not modifiable'
@@ -57,18 +156,16 @@ function! vim_markdown_links_naive#convert() abort
   let l:key_to_index = {}
   let l:ordered_refs = []
   let l:used_definition_labels = {}
-  let l:token_pattern = '\v\[\_[^][]+\]\([^()]+\)|\[\_[^][]+\]\[\_[^][]*\]'
-  let l:inline_link_pattern = '\v^\[\_[^][]+\]\([^()]+\)$'
   let l:converted_link_count = 0
   let l:body_text = join(l:body_lines, "\n")
   let l:converted_body_text = ''
   let l:start = 0
 
   while 1
-    let l:m = matchstrpos(l:body_text, l:token_pattern, l:start)
-    let l:token = l:m[0]
-    let l:from = l:m[1]
-    let l:to = l:m[2]
+    let l:token_data = s:vim_markdown_links_naive_next_body_token(l:body_text, l:start)
+    let l:token = get(l:token_data, 'token', '')
+    let l:from = get(l:token_data, 'from', -1)
+    let l:to = get(l:token_data, 'to', -1)
 
     if l:from < 0
       let l:converted_body_text .= strpart(l:body_text, l:start)
@@ -83,16 +180,9 @@ function! vim_markdown_links_naive#convert() abort
       continue
     endif
 
-    if l:token =~# l:inline_link_pattern
-      let l:text_separator = stridx(l:token, '](')
-      if l:text_separator < 1
-        let l:converted_body_text .= l:token
-        let l:start = l:to
-        continue
-      endif
-
-      let l:text = strpart(l:token, 1, l:text_separator - 1)
-      let l:inside = strpart(l:token, l:text_separator + 2, strlen(l:token) - l:text_separator - 3)
+    if get(l:token_data, 'kind', '') ==# 'inline'
+      let l:text = get(l:token_data, 'text', '')
+      let l:inside = get(l:token_data, 'inside', '')
       let l:url = matchstr(l:inside, '^\S\+')
       let l:title = substitute(l:inside, '^\S\+\s*', '', '')
 
@@ -110,15 +200,8 @@ function! vim_markdown_links_naive#convert() abort
         let l:converted_link_count += 1
       endif
     else
-      let l:text_separator = stridx(l:token, '][')
-      if l:text_separator < 1
-        let l:converted_body_text .= l:token
-        let l:start = l:to
-        continue
-      endif
-
-      let l:text = strpart(l:token, 1, l:text_separator - 1)
-      let l:label = strpart(l:token, l:text_separator + 2, strlen(l:token) - l:text_separator - 3)
+      let l:text = get(l:token_data, 'text', '')
+      let l:label = get(l:token_data, 'label', '')
       if empty(l:label)
         let l:label = l:text
       endif
