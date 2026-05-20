@@ -1,5 +1,8 @@
 # vim-markdown-links-naive
 
+> [!WARNING]
+> The code in this repository is written completely by AI. No human review applied.
+
 Vim plugin that exposes a single command:
 
 ```vim
