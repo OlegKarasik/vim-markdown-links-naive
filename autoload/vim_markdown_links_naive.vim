@@ -30,6 +30,18 @@ function! s:vim_markdown_links_naive_warn(message) abort
   echohl None
 endfunction
 
+function! vim_markdown_links_naive#register_plug_mappings() abort
+  call s:register_plug_mapping(
+        \ '<Plug>(MarkdownLinksAsReferences)',
+        \ '<Cmd>call vim_markdown_links_naive#convert()<CR>')
+endfunction
+
+function! s:register_plug_mapping(lhs, rhs) abort
+  if empty(maparg(a:lhs, 'n'))
+    execute 'nnoremap <silent> ' . a:lhs . ' ' . a:rhs
+  endif
+endfunction
+
 function! s:vim_markdown_links_naive_find_balanced_square_close(text, open_index) abort
   let l:depth = 1
   let l:index = a:open_index + 1
