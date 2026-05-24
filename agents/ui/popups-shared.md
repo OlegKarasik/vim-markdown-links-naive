@@ -18,8 +18,10 @@
 
 1. `j` or `Down` - move down
 2. `k` or `Up` - move up
-3. `Enter`, or `CR` - confirm selection
-4. `x` or `Esc` - close/cancel
+3. up/down navigation is cyclic: `k`/`Up` on first item goes to last, `j`/`Down`
+   on last item goes to first
+4. `Enter`, or `CR` - confirm selection
+5. `x` or `Esc` - close/cancel
 
 ## Search mode
 
